@@ -26,6 +26,15 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
+// Health check endpoint
+Route::get('/up', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now(),
+        'message' => 'Server is running'
+    ]);
+});
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
@@ -39,15 +48,17 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         // Subject routes (Admin only)
-        Route::get('/subjects', [SubjectController::class, 'index']);
-        Route::post('/subjects', [SubjectController::class, 'store']);
-        Route::get('/subjects/{subject}', [SubjectController::class, 'show']);
-        Route::put('/subjects/{subject}', [SubjectController::class, 'update']);
-        Route::delete('/subjects/{subject}', [SubjectController::class, 'destroy']);
-        Route::get('/subjects/grade-levels', [SubjectController::class, 'getGradeLevels']);
-        Route::get('/subjects/strands', [SubjectController::class, 'getStrands']);
-        Route::post('/subjects/{subject}/enroll', [SubjectController::class, 'enrollStudents']);
-        Route::post('/subjects/{subject}/unenroll', [SubjectController::class, 'unenrollStudents']);
+        Route::prefix('subjects')->group(function () {
+            Route::get('/', [SubjectController::class, 'index']);
+            Route::post('/', [SubjectController::class, 'store']);
+            Route::get('/{subject}', [SubjectController::class, 'show']);
+            Route::put('/{subject}', [SubjectController::class, 'update']);
+            Route::delete('/{subject}', [SubjectController::class, 'destroy']);
+            Route::get('/grade-levels', [SubjectController::class, 'getGradeLevels']);
+            Route::get('/strands', [SubjectController::class, 'getStrands']);
+            Route::post('/{subject}/enroll', [SubjectController::class, 'enrollStudents']);
+            Route::post('/{subject}/unenroll', [SubjectController::class, 'unenrollStudents']);
+        });
     });
 
     // Student only routes
@@ -65,19 +76,4 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Student routes
     Route::apiResource('students', StudentController::class);
-
-    // Subject Routes
-    Route::prefix('subjects')->group(function () {
-        Route::get('/', [SubjectController::class, 'index']);
-        Route::post('/', [SubjectController::class, 'store']);
-        Route::get('/{subject}', [SubjectController::class, 'show']);
-        Route::put('/{subject}', [SubjectController::class, 'update']);
-        Route::delete('/{subject}', [SubjectController::class, 'destroy']);
-        
-        // Additional subject routes
-        Route::get('/grade-levels', [SubjectController::class, 'getGradeLevels']);
-        Route::get('/strands', [SubjectController::class, 'getStrands']);
-        Route::post('/{subject}/enroll', [SubjectController::class, 'enrollStudents']);
-        Route::post('/{subject}/unenroll', [SubjectController::class, 'unenrollStudents']);
-    });
 }); 

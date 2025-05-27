@@ -17,6 +17,7 @@ import { useToast } from 'react-native-toast-notifications';
 import { fetchWithTimeout } from '../../config/api';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { env } from '../../config/env';
 
 interface Subject {
   id: number;
@@ -38,7 +39,8 @@ interface FormData {
   description: string;
 }
 
-const API_URL = 'http://127.0.0.1:3001/api';
+// Use environment configuration
+const API_URL = env.API_URL;
 
 // Add debounce delay constant
 const DEBOUNCE_DELAY = 1000; // 1 second delay
@@ -137,20 +139,44 @@ const SubjectsScreen = () => {
       
       // Debug log before making the request
       const token = await AsyncStorage.getItem('auth-token');
-      console.log('Making subjects request with:', {
+      const requestUrl = `${API_URL}/subjects?page=${page}&limit=${ITEMS_PER_PAGE}&search=${encodeURIComponent(searchQuery)}`;
+      console.log('Making subjects request:', {
         hasToken: !!token,
         tokenLength: token?.length,
-        url: `${API_URL}/subjects?page=${page}&limit=${ITEMS_PER_PAGE}&search=${encodeURIComponent(searchQuery)}`
+        url: requestUrl,
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : 'No token'
+        }
       });
+
+      // Test the server connection first
+      try {
+        const testResponse = await fetch(`${API_URL}/up`);
+        if (!testResponse.ok) {
+          throw new Error(`Server health check failed: ${testResponse.status} ${testResponse.statusText}`);
+        }
+        console.log('Server health check:', {
+          status: testResponse.status,
+          ok: testResponse.ok,
+          statusText: testResponse.statusText
+        });
+      } catch (testError) {
+        console.error('Server health check failed:', testError);
+        throw new Error('Server is not responding. Please try again later.');
+      }
       
       const pageNum = isRefresh ? 1 : page;
       const response = await fetchWithTimeout(
-        `${API_URL}/subjects?page=${pageNum}&limit=${ITEMS_PER_PAGE}&search=${encodeURIComponent(searchQuery)}`,
+        requestUrl,
         {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
         }
       );
@@ -159,28 +185,46 @@ const SubjectsScreen = () => {
       console.log('Subjects API Response:', {
         status: response.status,
         statusText: response.statusText,
-        ok: response.ok
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        let errorMessage = 'Failed to fetch subjects';
+        
         if (response.status === 401) {
-          // Log more details about the unauthorized error
-          const errorText = await response.text();
-          console.error('Unauthorized access details:', {
-            status: response.status,
-            statusText: response.statusText,
-            responseText: errorText
-          });
-          throw new Error('Please login to access this resource');
+          errorMessage = 'Please login to access this resource';
+        } else if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch (e) {
+            console.error('Error parsing error response:', e);
+          }
         }
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch subjects');
+        
+        throw new Error(errorMessage);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format from server');
       }
 
       const data = await response.json();
+      console.log('Subjects API Success Response:', {
+        success: data.success,
+        subjectsCount: data.subjects?.length,
+        hasMore: data.subjects?.length === ITEMS_PER_PAGE
+      });
       
       if (!data.success) {
         throw new Error(data.message || 'Failed to fetch subjects');
+      }
+
+      if (!Array.isArray(data.subjects)) {
+        throw new Error('Invalid subjects data format');
       }
 
       setSubjects(isRefresh ? data.subjects : [...subjects, ...data.subjects]);
@@ -190,11 +234,22 @@ const SubjectsScreen = () => {
     } catch (error) {
       console.error('Error fetching subjects:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch subjects');
-      if (retryCount < MAX_RETRIES) {
+      
+      // Only retry on network errors or server errors
+      if (retryCount < MAX_RETRIES && 
+          (error instanceof TypeError || 
+           (error instanceof Error && error.message.includes('Server is not responding')))) {
+        console.log(`Retrying fetch (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
         setTimeout(() => {
           setRetryCount(prev => prev + 1);
           fetchSubjects(isRefresh);
         }, RETRY_DELAY);
+      } else {
+        toast.show(error instanceof Error ? error.message : 'Failed to fetch subjects', {
+          type: 'error',
+          placement: 'top',
+          duration: 4000,
+        });
       }
     } finally {
       setLoading(false);

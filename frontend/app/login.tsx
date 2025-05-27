@@ -17,7 +17,9 @@ import {
 } from 'react-native';
 import { useAuth } from './context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL } from '../config/api';
+import { env } from '../config/env';
+
+const API_URL = env.API_URL;
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -46,9 +48,22 @@ export default function Login() {
     setLoading(true);
     try {
       console.log('Attempting login to:', `${API_URL}/auth/login`);
+      
+      // First, try to get CSRF cookie
+      await fetch(`${API_URL}/sanctum/csrf-cookie`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'include',
+        mode: 'cors',
         body: JSON.stringify({ email, password }),
       });
       

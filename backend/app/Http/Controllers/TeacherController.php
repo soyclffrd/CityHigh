@@ -36,13 +36,12 @@ class TeacherController extends Controller
             $perPage = $request->input('limit', 10);
             $teachers = $query->paginate($perPage);
 
-            // Get the teachers data and convert to array with image_url
-            $teachersArray = $teachers->items();
-            $teachersData = collect($teachersArray)->map(function ($teacher) {
+            // Convert teachers to array with image_url
+            $teachersData = $teachers->through(function ($teacher) {
                 $data = $teacher->toArray();
                 $data['image_url'] = $teacher->image_url;
                 return $data;
-            })->all();
+            })->items();
 
             Log::info('Found ' . count($teachersData) . ' teachers');
 

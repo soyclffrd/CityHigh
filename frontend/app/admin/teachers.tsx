@@ -18,7 +18,11 @@ import {
   View
 } from 'react-native';
 import { useToast } from 'react-native-toast-notifications';
-import { API_URL, fetchWithTimeout } from '../../config/api';
+import { env } from '../../config/env';
+import { fetchWithTimeout } from '../../config/api';
+
+// Remove the API_URL import and use env.API_URL instead
+const API_URL = env.API_URL;
 
 interface Teacher {
   id: string;

@@ -22,17 +22,6 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes(); // For soft deletes
         });
-
-        // Create a pivot table for subject-student relationships
-        Schema::create('subject_student', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('subject_id')->constrained()->onDelete('cascade');
-            $table->foreignId('student_id')->constrained()->onDelete('cascade');
-            $table->timestamps();
-
-            // Prevent duplicate enrollments
-            $table->unique(['subject_id', 'student_id']);
-        });
     }
 
     /**
@@ -40,7 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('subject_student');
         Schema::dropIfExists('subjects');
     }
 }; 

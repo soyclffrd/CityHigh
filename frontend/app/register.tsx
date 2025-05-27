@@ -17,7 +17,9 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from './context/AuthContext';
-import { API_URL } from '../config/api';
+import { env } from '../config/env';
+
+const API_URL = env.API_URL;
 
 interface FormErrors {
   name?: string;
